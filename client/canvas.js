@@ -1,3 +1,4 @@
+
 // client/canvas.js
 // Guard against multiple loads
 if (!window.__CANVAS_LOADED__) {

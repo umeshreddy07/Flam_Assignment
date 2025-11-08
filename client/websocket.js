@@ -1,78 +1,85 @@
 // client/websocket.js
-// Guard against multiple loads
 if (!window.__WS_LOADED__) {
   window.__WS_LOADED__ = true;
 
-  // IMPORTANT: ensure <script src="/socket.io/socket.io.js"></script> is included before this file
-  const socket = io({ transports: ['websocket', 'polling'] });
+  const socket = io({ transports: ["websocket", "polling"] });
   window.socket = socket;
 
-  // Keep a small map for labeling cursors / users (used by UI)
   const userMap = new Map(); // socketId -> { name, color }
 
-  function refreshUsers(users) {
-    // users: [{ userId, name, color }]
+  function setUsers(users) {
     userMap.clear();
     (users || []).forEach(u => userMap.set(u.userId, { name: u.name, color: u.color }));
-    if (window.UI && UI.updateUsers) UI.updateUsers(users);
+    if (window.UI && UI.updateUsers) UI.updateUsers(users || []);
   }
 
-  // Join after user clicks "Start Drawing" (UI calls this)
-  window.joinWithName = (name) => socket.emit('join', { name });
+  function readyCanvas(fn) {
+    if (window.Canvas && typeof fn === "function") fn();
+  }
 
-  // Outgoing helpers used by canvas.js & UI
+  // Public API used by UI / Canvas
+  window.joinWithName = (name) => socket.emit("join", { name });
+
   window.Net = {
-    beginStroke: (s) => socket.emit('stroke:begin', s),
-    point: (x, y)   => socket.emit('stroke:point', { x, y }),
-    endStroke: ()   => socket.emit('stroke:end'),
+    // Streaming
+    beginStroke: (s) => socket.emit("stroke:begin", s),
+    point: (x, y) => socket.emit("stroke:point", { x, y }),
+    endStroke: () => socket.emit("stroke:end"),
 
-    addShape: (shapeOp) => socket.emit('shape:add', shapeOp),
-    addSticky: (stickyOp) => socket.emit('shape:add', { ...stickyOp, type: 'sticky' }),
+    // Ops
+    addShape: (op) => socket.emit("shape:add", op),
+    addSticky: (op) => socket.emit("sticky:add", op),
 
-    clear: () => socket.emit('canvas:clear'),
-    undo:  () => socket.emit('ops:undo'),
-    redo:  () => socket.emit('ops:redo'),
+    // History controls
+    undo: () => socket.emit("ops:undo"),
+    redo: () => socket.emit("ops:redo"),
+    clear: () => socket.emit("canvas:clear"),
 
-    drawingStatus: (drawing) => socket.emit('drawing:status', { drawing }),
+    // Indicators
+    drawingStatus: (drawing) => socket.emit("drawing:status", { drawing }),
 
-    // convenience (optional) for name lookups
-    getUserName: (id) => userMap.get(id)?.name || '',
+    // Chat
+    sendChat: (text) => socket.emit("chat:msg", text),
+
+    // helper
+    getUserName: (id) => userMap.get(id)?.name || "",
   };
 
-  // ===== Bootstrap from server =====
-  socket.on('initialState', ({ ops, me, users }) => {
-    refreshUsers(users);
-    if (window.Canvas) {
-      Canvas.setColor(me?.color || '#000000');
-      Canvas.replaceAll(ops || []);
-    }
-    if (window.UI && UI.setConnected) UI.setConnected(true);
+  /* Bootstrap */
+  socket.on("initialState", ({ ops, me, users }) => {
+    setUsers(users);
+    readyCanvas(() => {
+      Canvas.setColor?.(me?.color || "#222");
+      Canvas.replaceAll?.(ops || []);
+    });
+    if (window.UI?.setConnected) UI.setConnected(true);
   });
 
-  // Presence
-  socket.on('users:update', refreshUsers);
+  socket.on("users:update", setUsers);
 
-  // Live stroke streaming
-  socket.on('stroke:begin', ({ from, s }) => {
-    if (window.Canvas) Canvas.remoteBegin(from, s);
-  });
-  socket.on('stroke:point', ({ from, p }) => {
-    if (window.Canvas) Canvas.remotePoint(from, p);
+  /* Streaming echoes to other clients for smoothness */
+  socket.on("stroke:begin", ({ from, s }) => readyCanvas(() => Canvas.remoteBegin?.(from, s)));
+  socket.on("stroke:point", ({ from, p }) => readyCanvas(() => Canvas.remotePoint?.(from, p)));
+  socket.on("stroke:end", ({ from }) => {
+    // Optional: if you add Canvas.remoteEnd, call it here
   });
 
-  // Committed operations
-  socket.on('op:commit', (op) => {
-    if (window.Canvas) Canvas.commit(op);
-  });
-  socket.on('op:remove', ({ id }) => {
-    if (window.Canvas) Canvas.removeById(id);
-  });
-  socket.on('state:replace', (allOps) => {
-    if (window.Canvas) Canvas.replaceAll(allOps || []);
-  });
+  /* Authoritative ops */
+  socket.on("op:commit", (op) => readyCanvas(() => Canvas.commit?.(op)));
+  socket.on("op:remove", ({ id }) => readyCanvas(() => Canvas.removeById?.(id)));
+  socket.on("state:replace", (allOps) => readyCanvas(() => Canvas.replaceAll?.(allOps)));
 
-  // Who is drawing (UI pill)
-  socket.on('drawing:status', (payload) => {
-    if (window.UI && UI.showWhoIsDrawing) UI.showWhoIsDrawing(payload);
+  /* Indicators */
+  socket.on("drawing:status", payload => window.UI?.showWhoIsDrawing?.(payload));
+
+  /* Connection banner (optional) */
+  socket.on("connect", () => {
+    const el = document.getElementById("connection-status");
+    if (el) { el.style.display = "block"; el.textContent = "🟢 Connected"; }
+  });
+  socket.on("disconnect", () => {
+    const el = document.getElementById("connection-status");
+    if (el) { el.style.display = "block"; el.textContent = "🔴 Disconnected"; }
+    window.UI?.setConnected?.(false);
   });
 }

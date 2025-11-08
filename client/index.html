@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
@@ -19,13 +19,6 @@
       <div class="gate-row">
         <input id="username" maxlength="20" placeholder="Type your name…" />
         <button id="startBtn" class="btn btn-primary">Enter</button>
-      </div>
-      <div class="gate-mini">
-        <label class="toggle">
-          <input type="checkbox" id="themeToggle" />
-          <span class="toggle-ui"><span>🌞</span><span>🌙</span></span>
-          <span class="toggle-label">Morning / Night</span>
-        </label>
       </div>
     </div>
   </div>
@@ -107,28 +100,6 @@
         <div class="panel-title">People online <span id="onlineCount" class="pill">0</span></div>
         <ul id="usersOnline" class="user-list"></ul>
       </div>
-
-      <div class="panel note">
-        <div class="row space">
-          <div>Morning / Night</div>
-          <label class="toggle small">
-            <input type="checkbox" id="themeToggleInline"/>
-            <span class="toggle-ui"><span>🌞</span><span>🌙</span></span>
-          </label>
-        </div>
-      </div>
-
-      <!-- Optional Chat UI (disabled until backend supports it) -->
-      <div class="panel disabled">
-        <div class="panel-title">Chat (enable on server)</div>
-        <div class="chat-box" id="chatBox" data-disabled="true">
-          <div id="chatMessages" class="chat-messages"></div>
-          <div class="chat-row">
-            <input id="chatInput" placeholder="(disabled)"/>
-            <button id="chatSend" class="btn" disabled>Send</button>
-          </div>
-        </div>
-      </div>
     </aside>
 
     <main class="stage">
@@ -158,3 +129,4 @@
   <script src="main.js"></script>
 </body>
 </html>
+

@@ -1,119 +1,134 @@
 // server/server.js
-const path = require('path');
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
+const express = require("express");
+const http = require("http");
+const { Server } = require("socket.io");
+const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const io = new Server(server, { cors: { origin: "*" } });
 
-/** ===== Authoritative state ===== **/
-let users = new Map();                 // socketId -> {name,color}
-let ops = [];                          // committed operations in order
-let redoStack = [];                    // global redo stack
-const liveStrokes = new Map();         // socketId -> {id, points, color, width, tool}
+app.use(express.static(path.join(__dirname, "../client")));
 
-function randColor() {
-  const h = Math.floor(Math.random() * 360);
-  return `hsl(${h} 80% 45%)`;
+function randomColor() {
+  const colors = ["#ff6b6b","#6c5ce7","#00cec9","#fdcb6e","#e84393","#0984e3"];
+  return colors[Math.floor(Math.random() * colors.length)];
 }
 
-function opId() { return Math.random().toString(36).slice(2, 10); }
+/** Global canvas state (single room). If you want rooms later, key these by roomId */
+let ops = [];               // committed operations [{id,type,...}]
+let redoStack = [];         // undone ops to redo
+const users = new Map();    // socketId -> { userId, name, color }
+const liveStrokes = new Map(); // socketId -> { color, width, tool, points: [] }
 
-/** ===== Helpers ===== **/
-function allUsers() {
-  return [...users.entries()].map(([id, u]) => ({ userId: id, name: u.name, color: u.color }));
-}
+io.on("connection", (socket) => {
+  // join with username
+  socket.on("join", ({ name }) => {
+    const user = { userId: socket.id, name: (name||"Guest").slice(0,40), color: randomColor() };
+    users.set(socket.id, user);
 
-function commitOp(op) {
-  ops.push(op);
-  redoStack.length = 0; // any commit clears redo
-}
-
-/** ===== IO ===== **/
-io.on('connection', (socket) => {
-  // user joins with name
-  socket.on('join', ({ name }) => {
-    users.set(socket.id, { name: name?.trim() || 'Guest', color: randColor() });
-
-    socket.emit('initialState', { ops, me: { id: socket.id, ...users.get(socket.id) }, users: allUsers() });
-    io.emit('users:update', allUsers());
+    // Send current state to this user
+    io.to(socket.id).emit("initialState", { ops, me: user, users: [...users.values()] });
+    io.emit("users:update", [...users.values()]);
   });
 
-  /** ---- live strokes ---- **/
-  socket.on('stroke:begin', ({ color, width, tool }) => {
-    const s = { id: opId(), type: 'stroke', points: [], color, width, tool: tool || 'pen' };
-    liveStrokes.set(socket.id, s);
-    socket.broadcast.emit('stroke:begin', { from: socket.id, s: { ...s, points: [] } });
+  /* ---------- Streaming freehand ---------- */
+  socket.on("stroke:begin", (s) => {
+    // start new live stroke buffer for this user
+    liveStrokes.set(socket.id, { ...s, points: [] });
+    socket.broadcast.emit("stroke:begin", { from: socket.id, s });
   });
 
-  socket.on('stroke:point', ({ x, y }) => {
-    const s = liveStrokes.get(socket.id);
-    if (!s) return;
-    s.points.push({ x, y });
-    // send only the latest point
-    socket.broadcast.volatile.emit('stroke:point', { from: socket.id, p: { x, y } });
+  socket.on("stroke:point", (p) => {
+    const cur = liveStrokes.get(socket.id);
+    if (!cur) return;
+    cur.points.push({ x: +p.x, y: +p.y });
+    socket.broadcast.emit("stroke:point", { from: socket.id, p: { x: +p.x, y: +p.y } });
   });
 
-  socket.on('stroke:end', () => {
-    const s = liveStrokes.get(socket.id);
-    if (!s) return;
+  socket.on("stroke:end", () => {
+    socket.broadcast.emit("stroke:end", { from: socket.id });
+
+    const cur = liveStrokes.get(socket.id);
+    if (cur && cur.points.length) {
+      // Commit a single STROKE op
+      const op = {
+        id: Date.now() + "_" + Math.random().toString(16).slice(2),
+        type: "stroke",
+        tool: cur.tool,
+        color: cur.color,
+        width: cur.width,
+        points: cur.points,
+      };
+      ops.push(op);
+      redoStack.length = 0; // new branch -> clear redo
+      io.emit("op:commit", op);
+    }
     liveStrokes.delete(socket.id);
-
-    // Commit full stroke (for perfect replay on new clients)
-    commitOp(s);
-    io.emit('op:commit', s);
-    // also broadcast that this user stopped drawing
-    const u = users.get(socket.id);
-    if (u) io.emit('drawing:status', { userId: socket.id, name: u.name, drawing: false });
   });
 
-  /** ---- shapes (single atomic op) ---- **/
-  socket.on('shape:add', (shapeOp) => {
-    const op = { id: opId(), type: 'shape', ...shapeOp };
-    commitOp(op);
-    io.emit('op:commit', op);
-  });
-
-  /** ---- clear ---- **/
-  socket.on('canvas:clear', () => {
-    ops.length = 0;
+  /* ---------- Shapes & stickies are single-shot ops ---------- */
+  socket.on("shape:add", (op) => {
+    const full = {
+      ...op,
+      id: Date.now() + "_" + Math.random().toString(16).slice(2),
+      type: "shape",
+    };
+    ops.push(full);
     redoStack.length = 0;
-    io.emit('state:replace', ops);
+    io.emit("op:commit", full);
   });
 
-  /** ---- global undo / redo ---- **/
-  socket.on('ops:undo', () => {
+  socket.on("sticky:add", (op) => {
+    const full = {
+      ...op,
+      id: Date.now() + "_" + Math.random().toString(16).slice(2),
+      type: "sticky",
+    };
+    ops.push(full);
+    redoStack.length = 0;
+    io.emit("op:commit", full);
+  });
+
+  /* ---------- Undo / Redo / Clear ---------- */
+  socket.on("ops:undo", () => {
     if (!ops.length) return;
     const removed = ops.pop();
     redoStack.push(removed);
-    io.emit('op:remove', { id: removed.id });
+    io.emit("op:remove", { id: removed.id });
   });
 
-  socket.on('ops:redo', () => {
+  socket.on("ops:redo", () => {
     if (!redoStack.length) return;
-    const restored = redoStack.pop();
-    ops.push(restored);
-    io.emit('op:commit', restored);
+    const again = redoStack.pop();
+    ops.push(again);
+    io.emit("op:commit", again);
   });
 
-  /** ---- drawing status ---- **/
-  socket.on('drawing:status', ({ drawing }) => {
+  socket.on("canvas:clear", () => {
+    ops = [];
+    redoStack = [];
+    io.emit("state:replace", []);
+  });
+
+  /* ---------- Indicators & chat (optional) ---------- */
+  socket.on("drawing:status", ({ drawing }) => {
+    const user = users.get(socket.id);
+    io.emit("drawing:status", { drawing: !!drawing, name: user?.name || "Guest" });
+  });
+
+  socket.on("chat:msg", (text) => {
     const u = users.get(socket.id);
-    if (u) socket.broadcast.emit('drawing:status', { userId: socket.id, name: u.name, drawing: !!drawing });
+    io.emit("chat:msg", { name: u?.name || "Unknown", color: u?.color || "#888", text: String(text||"").slice(0,300), ts: Date.now() });
   });
 
-  socket.on('disconnect', () => {
+  socket.on("disconnect", () => {
     users.delete(socket.id);
     liveStrokes.delete(socket.id);
-    io.emit('users:update', allUsers());
+    io.emit("users:update", [...users.values()]);
   });
 });
 
-/** static **/
-app.use(express.static(path.join(__dirname, '../client')));
-app.get('*', (_, res) => res.sendFile(path.join(__dirname, '../client/index.html')));
-
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log('listening on', PORT));
+server.listen(3000, () => {
+  console.log("✅ Server running at http://localhost:3000");
+});

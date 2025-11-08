@@ -1,52 +1,15 @@
 /* ======= Theme Vars (light / dark) ======= */
 :root {
-  --bg: #fdfcff;
+  --bg: #fff6fb;
   --panel: #ffffff;
-  --ink: #1a1a1a;
-  --ink-dim: #505050;
-  --muted: #8186a1;
-  --border: #ecebf5;
-  --shadow: 0 8px 32px rgba(30,30,60,.08);
-
-  --primary: #6c8cff;   /* periwinkle */
-  --good: #48d0b0;      /* mint */
-  --warn: #ffcf5a;      /* banana */
-  --danger: #ff7a8a;    /* coral pink */
-
-  --pill: #f2f3ff;
-  --pill-ink: #5c5fb8;
-
-  --btn-ink: #1b1f3a;
-  --btn-bg: #f7f8ff;
-
-  --avatar-ring: #ffffff;
-
-  --cursor-shadow: 0 8px 24px rgba(0,0,0,.12);
-}
-
-html[data-theme="dark"] {
-  --bg: #0f1220;
-  --panel: #12162a;
-  --ink: #eef1ff;
-  --ink-dim: #b0b6d4;
-  --muted: #8b90b5;
-  --border: #1e2543;
-  --shadow: 0 10px 28px rgba(2,8,38,.55);
-
-  --primary: #7ea0ff;
-  --good: #58e3c0;
-  --warn: #ffd476;
-  --danger: #ff8a9a;
-
-  --pill: #1a2146;
-  --pill-ink: #b6c4ff;
-
-  --btn-ink: #eaf0ff;
-  --btn-bg: #1a1f39;
-
-  --avatar-ring: #0f1220;
-
-  --cursor-shadow: 0 8px 24px rgba(0,0,0,.45);
+  --fg: #222;
+  --muted: #6b7280;
+  --accent: #ff72c6;
+  --good: #16a34a;
+  --warn: #f59e0b;
+  --danger: #ef4444;
+  --card: #fff4fa;
+  --border: #ffd4ea;
 }
 
 /* ======= Base ======= */
