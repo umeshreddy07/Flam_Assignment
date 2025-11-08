@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>🎨 Collaborative Canvas</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <!-- Username Gate (shown first) -->
+  <div id="usernameGate" class="gate">
+    <div class="gate-card">
+      <div class="logo">✨</div>
+      <h1>Welcome to Collab Canvas</h1>
+      <p>Pick a fun name and hop in!</p>
+      <div class="gate-row">
+        <input id="username" maxlength="20" placeholder="Type your name…" />
+        <button id="startBtn" class="btn btn-primary">Enter</button>
+      </div>
+      <div class="gate-mini">
+        <label class="toggle">
+          <input type="checkbox" id="themeToggle" />
+          <span class="toggle-ui"><span>🌞</span><span>🌙</span></span>
+          <span class="toggle-label">Morning / Night</span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Shell (hidden until connected) -->
+  <div id="appShell" class="app hidden">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">🎨</div>
+        <div class="brand-text">
+          <strong>Collab</strong><span>Canvas</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-row">
+          <label>Color</label>
+          <input type="color" id="colorPicker" value="#ff6b6b"/>
+        </div>
+        <div class="panel-row">
+          <label>Width</label>
+          <input type="range" id="widthRange" min="1" max="48" value="10"/>
+          <div class="width-chip"><span id="strokeWidthValue">10</span> px</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Brushes</div>
+        <div class="grid">
+          <button id="tool-pen"        data-tool="pen"        class="tool-btn active">🖊 Pen</button>
+          <button id="tool-pencil"     data-tool="pencil"     class="tool-btn">✏️ Pencil</button>
+          <button id="tool-marker"     data-tool="marker"     class="tool-btn">🖍 Marker</button>
+          <button id="tool-highlighter"data-tool="highlighter"class="tool-btn">🖌 Highlighter</button>
+          <button id="tool-eraser"     data-tool="eraser"     class="tool-btn danger">🧽 Eraser</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Shapes (drag to draw)</div>
+        <div class="grid">
+          <button id="tool-rect"     data-tool="rect"     class="tool-btn">▭ Rect</button>
+          <button id="tool-ellipse"  data-tool="ellipse"  class="tool-btn">◯ Ellipse</button>
+          <button id="tool-triangle" data-tool="triangle" class="tool-btn">△ Triangle</button>
+          <button id="tool-cube"     data-tool="cube"     class="tool-btn">▣ Cube</button>
+          <button id="tool-star"     data-tool="star"     class="tool-btn">⭐ Star</button>
+          <button id="tool-arrow"    data-tool="arrow"    class="tool-btn">➜ Arrow</button>
+          <button id="tool-speech"   data-tool="speech"   class="tool-btn">💬 Bubble</button>
+          <!-- cloud removed per your request -->
+        </div>
+        <div class="row mt8">
+          <label class="switch">
+            <input type="checkbox" id="shapePreviewToggle" checked/>
+            <span></span>
+            <em>Shape preview</em>
+          </label>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Text</div>
+        <div class="grid">
+          <button id="tool-sticky" data-tool="sticky" class="tool-btn">🗒 Sticky</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">Actions</div>
+        <div class="row gap">
+          <button id="undoBtn" class="btn">↶ Undo</button>
+          <button id="redoBtn" class="btn">↷ Redo</button>
+        </div>
+        <div class="row gap mt8">
+          <button id="clearBtn" class="btn danger">🗑 Clear</button>
+          <button id="saveBtn"  class="btn good">⬇ PNG</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">People online <span id="onlineCount" class="pill">0</span></div>
+        <ul id="usersOnline" class="user-list"></ul>
+      </div>
+
+      <div class="panel note">
+        <div class="row space">
+          <div>Morning / Night</div>
+          <label class="toggle small">
+            <input type="checkbox" id="themeToggleInline"/>
+            <span class="toggle-ui"><span>🌞</span><span>🌙</span></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Optional Chat UI (disabled until backend supports it) -->
+      <div class="panel disabled">
+        <div class="panel-title">Chat (enable on server)</div>
+        <div class="chat-box" id="chatBox" data-disabled="true">
+          <div id="chatMessages" class="chat-messages"></div>
+          <div class="chat-row">
+            <input id="chatInput" placeholder="(disabled)"/>
+            <button id="chatSend" class="btn" disabled>Send</button>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="stage">
+      <div class="stage-top">
+        <div id="roomBadge" class="badge">Room: lobby</div>
+        <div id="whoDrawing" class="who"></div>
+      </div>
+
+      <div class="canvas-wrap">
+        <canvas id="drawingCanvas"></canvas>
+        <!-- second canvas used only for previews -->
+        <canvas id="previewCanvas"></canvas>
+        <!-- live cursor container -->
+        <div id="cursorContainer"></div>
+      </div>
+    </main>
+  </div>
+
+  <div id="connection-status" class="conn hidden">Connecting…</div>
+
+  <!-- scripts: keep order (utils before websocket) -->
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="utils.js"></script>
+  <script src="ui.js"></script>
+  <script src="canvas.js"></script>
+  <script src="websocket.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+{
+  "name": "collaborative-canvas",
+  "version": "1.0.0",
+  "description": "A real-time collaborative drawing application.",
+  "main": "server/server.js",
+  "scripts": {
+    "start": "node server/server.js",
+    "dev": "concurrently \"node server/server.js\" \"cd client && npx serve -l 3000\""
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "express": "^4.21.2",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.1",
+    "serve": "^14.2.1"
+  }
+}
